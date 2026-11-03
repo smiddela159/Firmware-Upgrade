@@ -1,0 +1,54 @@
+# ==============================================================================
+# Broadband Firmware Upgrade Campaign Controller - Operational Tuning Parameters
+# ==============================================================================
+# This configuration file documents all operational tuning knobs, SLA thresholds,
+# and circuit breaker safety bounds decided upon for broadband fleet deployments.
+# ==============================================================================
+
+# Target broadband gateway simulator / ACS device management endpoint
+simulator_url: "http://localhost:8001"
+
+scheduler:
+  # Polling cadence for the campaign scheduler loop.
+  # DECISION / RATIONALE: 1,000ms (1 second).
+  # High enough to prevent CPU spinning, but low enough to immediately recycle
+  # concurrency slots as soon as devices complete their download or reboot cycle.
+  # Backed by Java 21 Virtual Threads, this cycle incurs negligible overhead (<1% CPU).
+  poll_interval_ms: 1000
+
+  # Max wait time for a device to emit an INFORM following an HTTP Connection-Request nudge.
+  # DECISION / RATIONALE: 15 seconds.
+  # In broadband TR-069 deployments, TCP connection establishment + TLS handshake +
+  # gateway queue latency typically takes 1-5 seconds. Setting a 15-second SLA accommodates
+  # transient radio/network scheduling jitter while avoiding tying up concurrency slots
+  # on unresponsive or powered-down CPE devices.
+  nudge_timeout_seconds: 15
+
+  # Max wait time for gateway command acknowledgment (ACCEPTED / REJECTED) after DOWNLOAD dispatch.
+  # DECISION / RATIONALE: 20 seconds.
+  # Gateways perform flash partition checks, firmware header validation, and signature
+  # verification synchronously before returning the command response. 20s grants ample
+  # compute time for the gateway CPU without holding the socket indefinitely if dropped.
+  ack_timeout_seconds: 20
+
+  # Max wait time for gateway image flashing, system reboot, and subsequent re-INFORM callback.
+  # DECISION / RATIONALE: 60 seconds.
+  # Modern residential broadband gateways (e.g., AT&T BGW320/BGW210) require 35 to 50 seconds
+  # to commit NAND flash blocks, perform hardware reset, bring up the Linux kernel, and initialize
+  # network interfaces. A 60-second timeout captures legitimate reboot sequences while promptly
+  # detecting gateways stuck in boot loops or flash corruption.
+  reboot_timeout_seconds: 60
+
+  # Maximum safe retries for nudging offline or unresponsive devices before declaring TIMED_OUT.
+  # DECISION / RATIONALE: 2 retries (3 total attempts = 45s aggregate wait).
+  # Connection-Request nudges are idempotent wake-up signals. Retrying twice protects against
+  # transient packet loss or network congestion without indefinitely starving the campaign
+  # concurrency budget. Devices actively in REBOOTING or DOWNLOAD_SENT are never retried.
+  max_nudge_retries: 2
+
+  # Minimum sample size of completed devices before the circuit breaker failure threshold is evaluated.
+  # DECISION / RATIONALE: 20 devices.
+  # Prevents the "small sample Poisson trap". In early rollout phases, 2 transient failures in the
+  # first 3 devices represents a 66% failure rate, which would prematurely halt a valid campaign.
+  # Requiring 20 completed devices ensures statistical significance before safety halts engage.
+  min_sample_size_for_threshold: 20

@@ -1,0 +1,26 @@
+# Build outputs
+target/
+*.jar
+*.war
+
+# Local database runtime files
+data/
+*.db
+*.mv.db
+*.trace.db
+
+# Operating System files
+.DS_Store
+Thumbs.db
+
+# IDE and Editor configs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Temporary / Archive directory
+_non_submission_archive/
+

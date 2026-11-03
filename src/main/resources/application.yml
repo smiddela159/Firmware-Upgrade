@@ -1,0 +1,46 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: firmware-upgrade-controller
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:h2:file:./data/campaign_db;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          public-key-location: classpath:jwt_public.pem
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: firmware-upgrade-controller
+
+controller:
+  simulator-url: ${SIMULATOR_URL:http://localhost:8001}
+  scheduler:
+    poll-interval-ms: 1000
+    nudge-timeout-seconds: 15
+    ack-timeout-seconds: 20
+    reboot-timeout-seconds: 60
+    max-nudge-retries: 2
+    min-sample-size-for-threshold: 20

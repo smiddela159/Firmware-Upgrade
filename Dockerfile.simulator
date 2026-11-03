@@ -1,0 +1,18 @@
+# Lightweight Python Simulator Container
+FROM python:3.12-alpine
+WORKDIR /app
+
+RUN pip install --no-cache-dir fastapi uvicorn httpx aiohttp
+
+COPY scripts/fw_simulator.py ./device_simulator.py
+
+EXPOSE 8001
+
+ENV SIMULATOR_PORT=8001 \
+    CONTROLLER_URL=http://controller:8000 \
+    DEVICE_COUNT=1000 \
+    SIM_SEED=42 \
+    SPEED_FACTOR=1.0
+
+CMD ["uvicorn", "device_simulator:app", "--host", "0.0.0.0", "--port", "8001"]
+

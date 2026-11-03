@@ -1,0 +1,88 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: firmware-upgrade-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - broadband-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  controller:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: firmware-upgrade-controller
+    ports:
+      - "8000:8000"
+    environment:
+      - SIMULATOR_URL=http://simulator:8001
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_PROFILES_ACTIVE=prod
+      - JAVA_OPTS=-Xms64m -Xmx256m -XX:+UseG1GC
+    volumes:
+      - controller-data:/app/data
+    restart: unless-stopped
+    depends_on:
+      simulator:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - broadband-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8000/actuator/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.simulator
+    container_name: device-simulator
+    ports:
+      - "8001:8001"
+    environment:
+      - CONTROLLER_URL=http://controller:8000
+      - DEVICE_COUNT=500
+      - SEED=42
+      - SPEED_FACTOR=0.5
+      - PERIODIC_INFORM_SEC=300
+      - DOWNLOAD_MIN_SEC=1
+      - DOWNLOAD_MAX_SEC=5
+      - REBOOT_MIN_SEC=2
+      - REBOOT_MAX_SEC=20
+      - P_DUPLICATE=0.05
+      - P_LATE=0.05
+      - LATE_EXTRA_SEC=600
+      - P_OFFLINE=0.05
+      - P_REJECT=0.03
+      - P_FAULT=0.04
+      - P_NO_TC=0.03
+      - P_REVERT=0.02
+    restart: unless-stopped
+    networks:
+      - broadband-net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\" || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+
+volumes:
+  controller-data:
+    driver: local
+
+networks:
+  broadband-net:
+    driver: bridge
+
